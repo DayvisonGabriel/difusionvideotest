@@ -52,4 +52,4 @@ with gr.Blocks() as demo:
 
     gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps], outputs=video_output)
 
-demo.launch(debug=True)
+demo.launch(debug=True,share=True)
