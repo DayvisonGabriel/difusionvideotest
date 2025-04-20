@@ -22,24 +22,34 @@ def gerar_video(image, prompt, duration, fps):
     if image is None:
         return None
 
-    # Guardar resolução original
+    num_frames = min(int(duration * fps), 25)  # modelo suporta até 25 frames
+
+    # Guarda o tamanho proporcional original
     original_size = image.size  # (width, height)
 
-    num_frames = min(int(duration * fps), 25)  # máximo 25 frames
+    # Redimensiona proporcionalmente para caber em 512x512
+    image.thumbnail((512, 512), Image.LANCZOS)  # mantém proporção
+    thumb_size = image.size
 
-    # Redimensionar para 512x512 para o modelo
-    input_image = image.convert("RGB").resize((512, 512))
+    # Cria fundo preto 512x512
+    background = Image.new("RGB", (512, 512), (0, 0, 0))
+    offset = ((512 - thumb_size[0]) // 2, (512 - thumb_size[1]) // 2)
+    background.paste(image, offset)
+    
+    # Usa imagem com barras pretas como input para o modelo
+    video_frames = pipe(background, decode_chunk_size=8, num_frames=num_frames).frames[0]
 
-    # Geração com o modelo
-    video_frames = pipe(input_image, decode_chunk_size=8, num_frames=num_frames).frames[0]
+    # Recorta os frames para o tamanho proporcional original (sem as barras pretas)
+    crop_width, crop_height = thumb_size
+    crop_x = (512 - crop_width) // 2
+    crop_y = (512 - crop_height) // 2
 
-    # Redimensionar frames para o tamanho original da imagem
-    resized_frames = [frame.resize(original_size, Image.LANCZOS) for frame in video_frames]
+    cropped_frames = [frame.crop((crop_x, crop_y, crop_x + crop_width, crop_y + crop_height)) for frame in video_frames]
 
-    # Salvar vídeo
+    # Salva vídeo temporário
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
         video_path = f.name
-        imageio.mimsave(video_path, resized_frames, fps=fps)
+        imageio.mimsave(video_path, cropped_frames, fps=fps)
 
     return video_path
 
