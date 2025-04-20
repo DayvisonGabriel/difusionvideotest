@@ -70,7 +70,7 @@ with gr.Blocks() as demo:
         image_input = gr.Image(type="pil", label="Imagem Base")
         with gr.Column():
             prompt = gr.Textbox(label="Prompt (não utilizado no modelo atual, mas reservado)", placeholder="ex: estilo Studio Ghibli")
-            duration = gr.Slider(2, 6, value=4, step=2, label="Duração (segundos)")  # múltiplos de 2
+            duration = gr.Slider(2, 12, value=4, step=2, label="Duração (segundos)")  # até 12s
             fps = gr.Slider(4, 12, value=12, step=1, label="FPS")
 
     gerar_btn = gr.Button("Gerar Vídeo")
@@ -79,4 +79,5 @@ with gr.Blocks() as demo:
     gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps], outputs=video_output)
 
 demo.launch(debug=True, share=True)
+
 
