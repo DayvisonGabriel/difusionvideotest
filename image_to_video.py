@@ -44,8 +44,8 @@ with gr.Blocks() as demo:
         image_input = gr.Image(type="pil", label="Imagem Base")
         with gr.Column():
             prompt = gr.Textbox(label="Prompt (não utilizado no modelo atual, mas reservado)", placeholder="ex: estilo Studio Ghibli")
-            duration = gr.Slider(1, 6, value=2, step=1, label="Duração (segundos)")
-            fps = gr.Slider(4, 12, value=6, step=1, label="FPS")
+            duration = gr.Slider(1, 6, value=5, step=1, label="Duração (segundos)")
+            fps = gr.Slider(4, 12, value=12, step=1, label="FPS")
 
     gerar_btn = gr.Button("Gerar Vídeo")
     video_output = gr.Video(label="Resultado")
