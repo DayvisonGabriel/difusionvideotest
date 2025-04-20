@@ -21,18 +21,25 @@ pipe.enable_model_cpu_offload()
 def gerar_video(image, prompt, duration, fps):
     if image is None:
         return None
-    
-    num_frames = min(int(duration * fps), 25)  # o modelo suporta até 25 frames
 
-    image = image.convert("RGB").resize((512, 512))
+    # Guardar resolução original
+    original_size = image.size  # (width, height)
 
-    # Aplica o pipeline
-    video_frames = pipe(image, decode_chunk_size=8, num_frames=num_frames).frames[0]
+    num_frames = min(int(duration * fps), 25)  # máximo 25 frames
 
-    # Salva vídeo
+    # Redimensionar para 512x512 para o modelo
+    input_image = image.convert("RGB").resize((512, 512))
+
+    # Geração com o modelo
+    video_frames = pipe(input_image, decode_chunk_size=8, num_frames=num_frames).frames[0]
+
+    # Redimensionar frames para o tamanho original da imagem
+    resized_frames = [frame.resize(original_size, Image.LANCZOS) for frame in video_frames]
+
+    # Salvar vídeo
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
         video_path = f.name
-        imageio.mimsave(video_path, video_frames, fps=fps)
+        imageio.mimsave(video_path, resized_frames, fps=fps)
 
     return video_path
 
@@ -52,4 +59,4 @@ with gr.Blocks() as demo:
 
     gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps], outputs=video_output)
 
-demo.launch(debug=True,share=True)
+demo.launch(debug=True, share=True)
