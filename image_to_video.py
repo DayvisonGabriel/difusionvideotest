@@ -17,7 +17,33 @@ pipe = StableVideoDiffusionPipeline.from_pretrained(
 
 pipe.enable_model_cpu_offload()
 
-# Função de geração
+# Função para redimensionar a imagem proporcionalmente e adicionar fundo preto
+def redimensionar_imagem(imagem):
+    largura, altura = imagem.size
+    
+    # Calculando a proporção de redimensionamento
+    proporcao = min(512 / largura, 512 / altura)
+    
+    # Calculando as novas dimensões
+    nova_largura = int(largura * proporcao)
+    nova_altura = int(altura * proporcao)
+    
+    # Redimensionando a imagem
+    imagem_redimensionada = imagem.resize((nova_largura, nova_altura))
+    
+    # Criando uma nova imagem de fundo preto com 512x512
+    imagem_com_fundo = Image.new("RGB", (512, 512), (0, 0, 0))  # Cor preta (0, 0, 0)
+    
+    # Calculando a posição de inserção da imagem redimensionada no centro
+    x_offset = (512 - nova_largura) // 2
+    y_offset = (512 - nova_altura) // 2
+    
+    # Colocando a imagem redimensionada sobre o fundo preto
+    imagem_com_fundo.paste(imagem_redimensionada, (x_offset, y_offset))
+    
+    return imagem_com_fundo
+
+# Função de geração do vídeo
 def gerar_video(image, prompt, duration, fps):
     if image is None:
         return None
@@ -26,21 +52,8 @@ def gerar_video(image, prompt, duration, fps):
     num_blocks = duration // 2
     frames_per_block = min(int(2 * fps), 25)  # máximo de 25 frames por bloco
 
-    # Processamento da imagem de entrada
-    original_width, original_height = image.size
-    aspect_ratio = original_width / original_height
-
-    if aspect_ratio == 1:
-        image = image.resize((512, 512), Image.LANCZOS)
-        processed_image = image
-    else:
-        image.thumbnail((512, 512), Image.LANCZOS)
-        thumb_size = image.size
-
-        background = Image.new("RGB", (512, 512), (0, 0, 0))
-        offset = ((512 - thumb_size[0]) // 2, (512 - thumb_size[1]) // 2)
-        background.paste(image, offset)
-        processed_image = background
+    # Processamento da imagem de entrada com redimensionamento e fundo preto
+    processed_image = redimensionar_imagem(image)
 
     current_input = processed_image
     all_frames = []
