@@ -5,6 +5,7 @@ from PIL import Image
 import tempfile
 import imageio
 import os
+from tqdm import tqdm
 
 # Carrega o modelo
 model_id = "stabilityai/stable-video-diffusion-img2vid-xt"
@@ -17,85 +18,57 @@ pipe = StableVideoDiffusionPipeline.from_pretrained(
 
 pipe.enable_model_cpu_offload()
 
-# Função para redimensionar a imagem proporcionalmente e adicionar fundo preto
-def redimensionar_imagem(imagem):
-    target_width = 951
-    target_height = 537
+# Redimensionamento com fundo preto para 951x537
+def redimensionar_com_fundo_preto(img, alvo_largura=951, alvo_altura=537):
+    img.thumbnail((alvo_largura, alvo_altura), Image.LANCZOS)
+    fundo = Image.new("RGB", (alvo_largura, alvo_altura), (0, 0, 0))
+    offset_x = (alvo_largura - img.width) // 2
+    offset_y = (alvo_altura - img.height) // 2
+    fundo.paste(img, (offset_x, offset_y))
+    return fundo
 
-    largura, altura = imagem.size
-
-    # Calcula o fator de escala proporcional
-    proporcao = min(target_width / largura, target_height / altura)
-
-    nova_largura = int(largura * proporcao)
-    nova_altura = int(altura * proporcao)
-
-    imagem_redimensionada = imagem.resize((nova_largura, nova_altura), Image.LANCZOS)
-
-    # Cria imagem de fundo preto
-    imagem_com_fundo = Image.new("RGB", (target_width, target_height), (0, 0, 0))
-
-    # Centraliza a imagem redimensionada no fundo preto
-    x_offset = (target_width - nova_largura) // 2
-    y_offset = (target_height - nova_altura) // 2
-
-    imagem_com_fundo.paste(imagem_redimensionada, (x_offset, y_offset))
-
-    return imagem_com_fundo
-
-# Função de geração do vídeo
-def gerar_video(image, prompt, duration, fps, progress=gr.Progress()):
+# Função de geração
+def gerar_video(image, prompt, duration, fps):
     if image is None:
         return None
 
-    # Garante que duration é múltiplo de 2 (já forçado pelo slider)
-    num_blocks = duration // 2
-    frames_per_block = min(int(2 * fps), 25)  # máximo de 25 frames por bloco
+    with gr.Progress(track_tqdm=True):
+        # Ajusta a imagem de entrada para o tamanho esperado
+        processed_image = redimensionar_com_fundo_preto(image)
 
-    # Processamento da imagem de entrada com redimensionamento e fundo preto
-    processed_image = redimensionar_imagem(image)
+        # Calcula blocos de 2s e frames por bloco
+        num_blocks = duration // 2
+        frames_per_block = min(int(2 * fps), 25)  # máximo 25
 
-    current_input = processed_image
-    all_frames = []
+        current_input = processed_image
+        all_frames = []
 
-    # Atualizando progresso inicial
-    total_frames = num_blocks * frames_per_block
-    progress(0, total_frames)  # Começa do zero e vai até o total de frames
+        for i in tqdm(range(num_blocks), desc="Gerando vídeo"):
+            result = pipe(current_input, decode_chunk_size=8, num_frames=frames_per_block).frames[0]
+            all_frames.extend(result)
+            current_input = result[-1]  # último frame vira a próxima entrada
 
-    for i in range(num_blocks):
-        result = pipe(current_input, decode_chunk_size=8, num_frames=frames_per_block).frames[0]
-        all_frames.extend(result)
-
-        # Usa o último frame como nova entrada
-        last_frame = result[-1]
-        current_input = last_frame
-
-        # Atualiza o progresso durante o processamento
-        frames_processed = (i + 1) * frames_per_block
-        progress(frames_processed, total_frames)
-
-    # Salva vídeo final
-    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
-        video_path = f.name
-        imageio.mimsave(video_path, all_frames, fps=fps)
+        # Salva vídeo em arquivo temporário
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            video_path = f.name
+            imageio.mimsave(video_path, all_frames, fps=fps)
 
     return video_path
 
-# Interface
+# Interface Gradio
 with gr.Blocks() as demo:
-    gr.Markdown("## Stable Video Diffusion - Vídeo a partir de Imagem")
+    gr.Markdown("## 🎥 Stable Video Diffusion - Geração de Vídeo a partir de Imagem")
 
     with gr.Row():
         image_input = gr.Image(type="pil", label="Imagem Base")
         with gr.Column():
-            prompt = gr.Textbox(label="Prompt (não utilizado no modelo atual, mas reservado)", placeholder="ex: estilo Studio Ghibli")
-            duration = gr.Slider(2, 12, value=4, step=2, label="Duração (segundos)")  # até 12s, múltiplos de 2
-            fps = gr.Slider(4, 12, value=12, step=1, label="FPS")
+            prompt = gr.Textbox(label="Prompt (opcional)", placeholder="ex: estilo anime, realista, etc.")
+            duration = gr.Slider(2, 12, value=4, step=2, label="⏱️ Duração do Vídeo (segundos)")
+            fps = gr.Slider(4, 12, value=12, step=1, label="🎞️ FPS")
 
-    gerar_btn = gr.Button("Gerar Vídeo")
-    video_output = gr.Video(label="Resultado")
-    progress_bar = gr.Progress()
+    gerar_btn = gr.Button("🚀 Gerar Vídeo")
+    video_output = gr.Video(label="🎬 Resultado do Vídeo")
 
-    gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps, progress_bar], outputs=video_output)
+    gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps], outputs=video_output)
 
 demo.launch(debug=True, share=True)
