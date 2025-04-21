@@ -19,28 +19,28 @@ pipe.enable_model_cpu_offload()
 
 # Função para redimensionar a imagem proporcionalmente e adicionar fundo preto
 def redimensionar_imagem(imagem):
+    target_width = 951
+    target_height = 537
+
     largura, altura = imagem.size
-    
-    # Calculando a proporção de redimensionamento
-    proporcao = min(512 / largura, 512 / altura)
-    
-    # Calculando as novas dimensões
+
+    # Calcula o fator de escala proporcional
+    proporcao = min(target_width / largura, target_height / altura)
+
     nova_largura = int(largura * proporcao)
     nova_altura = int(altura * proporcao)
-    
-    # Redimensionando a imagem
-    imagem_redimensionada = imagem.resize((nova_largura, nova_altura))
-    
-    # Criando uma nova imagem de fundo preto com 512x512
-    imagem_com_fundo = Image.new("RGB", (512, 512), (0, 0, 0))  # Cor preta (0, 0, 0)
-    
-    # Calculando a posição de inserção da imagem redimensionada no centro
-    x_offset = (512 - nova_largura) // 2
-    y_offset = (512 - nova_altura) // 2
-    
-    # Colocando a imagem redimensionada sobre o fundo preto
+
+    imagem_redimensionada = imagem.resize((nova_largura, nova_altura), Image.LANCZOS)
+
+    # Cria imagem de fundo preto
+    imagem_com_fundo = Image.new("RGB", (target_width, target_height), (0, 0, 0))
+
+    # Centraliza a imagem redimensionada no fundo preto
+    x_offset = (target_width - nova_largura) // 2
+    y_offset = (target_height - nova_altura) // 2
+
     imagem_com_fundo.paste(imagem_redimensionada, (x_offset, y_offset))
-    
+
     return imagem_com_fundo
 
 # Função de geração do vídeo
