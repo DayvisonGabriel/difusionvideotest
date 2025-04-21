@@ -44,7 +44,7 @@ def redimensionar_imagem(imagem):
     return imagem_com_fundo
 
 # Função de geração do vídeo
-def gerar_video(image, prompt, duration, fps):
+def gerar_video(image, prompt, duration, fps, progress=gr.Progress()):
     if image is None:
         return None
 
@@ -58,6 +58,10 @@ def gerar_video(image, prompt, duration, fps):
     current_input = processed_image
     all_frames = []
 
+    # Atualizando progresso inicial
+    total_frames = num_blocks * frames_per_block
+    progress(0, total_frames)  # Começa do zero e vai até o total de frames
+
     for i in range(num_blocks):
         result = pipe(current_input, decode_chunk_size=8, num_frames=frames_per_block).frames[0]
         all_frames.extend(result)
@@ -65,6 +69,10 @@ def gerar_video(image, prompt, duration, fps):
         # Usa o último frame como nova entrada
         last_frame = result[-1]
         current_input = last_frame
+
+        # Atualiza o progresso durante o processamento
+        frames_processed = (i + 1) * frames_per_block
+        progress(frames_processed, total_frames)
 
     # Salva vídeo final
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
@@ -86,7 +94,8 @@ with gr.Blocks() as demo:
 
     gerar_btn = gr.Button("Gerar Vídeo")
     video_output = gr.Video(label="Resultado")
+    progress_bar = gr.Progress()
 
-    gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps], outputs=video_output)
+    gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps, progress_bar], outputs=video_output)
 
 demo.launch(debug=True, share=True)
