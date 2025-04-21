@@ -5,7 +5,6 @@ from PIL import Image
 import tempfile
 import imageio
 import os
-from tqdm import tqdm
 
 # Carrega o modelo
 model_id = "stabilityai/stable-video-diffusion-img2vid-xt"
@@ -28,30 +27,26 @@ def redimensionar_com_fundo_preto(img, alvo_largura=951, alvo_altura=537):
     return fundo
 
 # Função de geração
-def gerar_video(image, prompt, duration, fps):
+def gerar_video(image, prompt, duration, fps, progress=gr.Progress(track_tqdm=True)):
     if image is None:
         return None
 
-    with gr.Progress(track_tqdm=True):
-        # Ajusta a imagem de entrada para o tamanho esperado
-        processed_image = redimensionar_com_fundo_preto(image)
+    processed_image = redimensionar_com_fundo_preto(image)
 
-        # Calcula blocos de 2s e frames por bloco
-        num_blocks = duration // 2
-        frames_per_block = min(int(2 * fps), 25)  # máximo 25
+    num_blocks = duration // 2
+    frames_per_block = min(int(2 * fps), 25)
 
-        current_input = processed_image
-        all_frames = []
+    current_input = processed_image
+    all_frames = []
 
-        for i in tqdm(range(num_blocks), desc="Gerando vídeo"):
-            result = pipe(current_input, decode_chunk_size=8, num_frames=frames_per_block).frames[0]
-            all_frames.extend(result)
-            current_input = result[-1]  # último frame vira a próxima entrada
+    for i in progress.tqdm(range(num_blocks), desc="Gerando vídeo"):
+        result = pipe(current_input, decode_chunk_size=8, num_frames=frames_per_block).frames[0]
+        all_frames.extend(result)
+        current_input = result[-1]
 
-        # Salva vídeo em arquivo temporário
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
-            video_path = f.name
-            imageio.mimsave(video_path, all_frames, fps=fps)
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+        video_path = f.name
+        imageio.mimsave(video_path, all_frames, fps=fps)
 
     return video_path
 
@@ -69,6 +64,10 @@ with gr.Blocks() as demo:
     gerar_btn = gr.Button("🚀 Gerar Vídeo")
     video_output = gr.Video(label="🎬 Resultado do Vídeo")
 
-    gerar_btn.click(fn=gerar_video, inputs=[image_input, prompt, duration, fps], outputs=video_output)
+    gerar_btn.click(
+        fn=gerar_video,
+        inputs=[image_input, prompt, duration, fps],
+        outputs=video_output
+    )
 
 demo.launch(debug=True, share=True)
