@@ -17,6 +17,9 @@ pipe = StableVideoDiffusionPipeline.from_pretrained(
 
 pipe.enable_model_cpu_offload()
 
+# Variável global para armazenar o caminho do último vídeo
+ultimo_video_path = None
+
 # Redimensionamento com fundo preto para 951x537
 def redimensionar_com_fundo_preto(img, alvo_largura=951, alvo_altura=537):
     img.thumbnail((alvo_largura, alvo_altura), Image.LANCZOS)
@@ -26,8 +29,19 @@ def redimensionar_com_fundo_preto(img, alvo_largura=951, alvo_altura=537):
     fundo.paste(img, (offset_x, offset_y))
     return fundo
 
-# Função de geração
+# Função para apagar vídeo anterior
+def limpar_video_anterior(nova_imagem):
+    global ultimo_video_path
+    if ultimo_video_path and os.path.exists(ultimo_video_path):
+        os.remove(ultimo_video_path)
+        print(f"🧹 Vídeo anterior removido: {ultimo_video_path}")
+        ultimo_video_path = None
+    return None  # Isso garante que o componente de vídeo seja limpo visualmente
+
+# Função de geração de vídeo
 def gerar_video(image, prompt, duration, fps, progress=gr.Progress(track_tqdm=True)):
+    global ultimo_video_path
+
     if image is None:
         return None
 
@@ -48,6 +62,7 @@ def gerar_video(image, prompt, duration, fps, progress=gr.Progress(track_tqdm=Tr
         video_path = f.name
         imageio.mimsave(video_path, all_frames, fps=fps)
 
+    ultimo_video_path = video_path
     return video_path
 
 # Interface Gradio
@@ -63,6 +78,9 @@ with gr.Blocks() as demo:
 
     gerar_btn = gr.Button("🚀 Gerar Vídeo")
     video_output = gr.Video(label="🎬 Resultado do Vídeo")
+
+    # Quando uma nova imagem é enviada, limpa o vídeo
+    image_input.upload(fn=limpar_video_anterior, inputs=image_input, outputs=video_output)
 
     gerar_btn.click(
         fn=gerar_video,
